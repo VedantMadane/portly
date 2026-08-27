@@ -13,7 +13,17 @@ pub fn kill_on_port(port: u16, force: bool) -> Result<bool, KillError> {
     }
     let mut denied = false;
     let mut killed_any = false;
+    let self_pid = std::process::id();
     for process in &processes {
+        // Never terminate the calling process (in-process test servers, etc.).
+        if process.pid == self_pid {
+            continue;
+        }
+        // Unix: refuse init / kernel placeholders (Windows already skips 0/4).
+        #[cfg(unix)]
+        if process.pid <= 1 {
+            continue;
+        }
         match crate::platform::kill_pid(process.pid, force) {
             Ok(()) => killed_any = true,
             Err(KillError::Permission) => denied = true,
@@ -37,6 +47,7 @@ pub fn kill_on_port(port: u16, force: bool) -> Result<bool, KillError> {
 #[cfg(any(target_os = "linux", target_os = "macos", windows))]
 mod tests {
     use super::kill_on_port;
+    use crate::model::KillError;
 
     #[test]
     fn kill_on_port_free_port_returns_false() {
@@ -48,5 +59,18 @@ mod tests {
             .unwrap()
             .port();
         assert!(!kill_on_port(port, false).unwrap());
+    }
+
+    #[test]
+    fn kill_pid_refuses_calling_process() {
+        let err = crate::platform::kill_pid(std::process::id(), true).unwrap_err();
+        match err {
+            KillError::Other(msg) => assert!(
+                msg.to_ascii_lowercase().contains("calling process")
+                    || msg.to_ascii_lowercase().contains("self"),
+                "unexpected message: {msg}"
+            ),
+            other => panic!("expected Other, got {other:?}"),
+        }
     }
 }
