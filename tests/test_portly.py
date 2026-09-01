@@ -137,6 +137,15 @@ class TestKill:
         proc.wait(timeout=5)
         assert proc.poll() is not None
 
+    def test_kill_spares_in_process_listener(
+        self, temp_server: tuple[socket.socket, int]
+    ) -> None:
+        # Regression for #49: kill must not terminate the calling process when
+        # the listener is in-process (common in test cleanup).
+        _, port = temp_server
+        assert pw.kill(port) is False
+        assert not pw.is_available(port)
+
 
 class TestScan:
     """Tests for scan."""

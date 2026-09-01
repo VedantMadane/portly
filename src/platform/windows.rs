@@ -179,9 +179,7 @@ pub fn kill_pid(pid: u32, _force: bool) -> Result<(), KillError> {
     }
     // System idle / system process — never terminate.
     if pid == 0 || pid == 4 {
-        return Err(KillError::Other(
-            "refusing to kill a system process".into(),
-        ));
+        return Err(KillError::Other("refusing to kill a system process".into()));
     }
     unsafe {
         let handle = OpenProcess(PROCESS_TERMINATE, 0, pid);
